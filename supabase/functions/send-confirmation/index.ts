@@ -39,14 +39,48 @@ serve(async (req) => {
                 subject: 'Confirmação de Recadastramento 2025',
                 html: `
           <h1>Olá, ${record.full_name}!</h1>
-          <p>Recebemos seus dados com sucesso.</p>
-          <p>Você pode conferir as informações enviadas acessando o link abaixo:</p>
-          <p>
-            <a href="http://localhost:5173/?id=${record.id}" style="padding: 12px 24px; background-color: #A4161A; color: white; text-decoration: none; border-radius: 5px;">
-              Ver Meu Cadastro
-            </a>
-          </p>
-          <p>Atenciosamente,<br>Equipe GEC</p>
+          <p>Recebemos seus dados com sucesso, conforme descrito abaixo:</p>
+
+          <h3>Dados Completos</h3>
+          <ul style="list-style: none; padding: 0;">
+            ${Object.entries(record)
+                        .filter(([key]) => !['id', 'created_at', 'updated_at', 'user_id', 'full_name'].includes(key))
+                        .map(([key, value]) => {
+                            const label = {
+                                email: 'Email',
+                                cpf: 'CPF',
+                                rg: 'RG',
+                                dob: 'Data de Nascimento',
+                                street: 'Logradouro',
+                                neighborhood: 'Bairro',
+                                city: 'Cidade',
+                                address_obs: 'Observação Endereço',
+                                whatsapp: 'WhatsApp',
+                                professional_data: 'Dados Profissionais',
+                                spouse_data: 'Dados Cônjuge',
+                                dependents_data: 'Dependentes'
+                            }[key] || key;
+
+                            let displayValue = value;
+                            if (typeof value === 'object' && value !== null) {
+                                displayValue = JSON.stringify(value, null, 2);
+                                if (key === 'dependents_data' && Array.isArray(value)) {
+                                    displayValue = value.map((d: any) => `${d.name} (${d.dob})`).join(', ');
+                                    if (!value.length) displayValue = 'Nenhum';
+                                } else if (key === 'spouse_data') {
+                                    displayValue = `${(value as any).name}`;
+                                } else if (key === 'professional_data') {
+                                    displayValue = `${(value as any).profession} - ${(value as any).company}`;
+                                }
+                            }
+
+                            return `<li style="margin-bottom: 8px;"><strong>${label}:</strong> ${displayValue || '-'}</li>`;
+                        }).join('')}
+          </ul>
+
+          <p>Caso tenha alguma informação errada favor entrar em contato.</p>
+
+          <p>Atenciosamente,<br>Diretoria GEC</p>
         `,
             }),
         });

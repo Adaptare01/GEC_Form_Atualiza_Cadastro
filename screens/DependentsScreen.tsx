@@ -77,11 +77,7 @@ export const DependentsScreen: React.FC<DependentsScreenProps> = ({ onNext, onBa
 
       // Send confirmation email asynchronously (fire and forget)
       if (result && result.id) {
-        sendConfirmationEmail({
-          id: result.id,
-          full_name: formData.fullName,
-          email: formData.email
-        });
+        sendConfirmationEmail(result);
       }
 
       onNext(); // Go to Success Screen

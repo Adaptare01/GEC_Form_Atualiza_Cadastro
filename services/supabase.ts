@@ -73,4 +73,16 @@ export const checkCpfExists = async (cpf: string): Promise<boolean> => {
     return !!data;
 };
 
+export const sendConfirmationEmail = async (params: any) => {
+    if (!supabase) return;
+
+    const { error } = await supabase.functions.invoke('send-confirmation', {
+        body: { record: params }
+    });
+
+    if (error) {
+        console.error('Error sending confirmation email:', error);
+    }
+};
+
 
