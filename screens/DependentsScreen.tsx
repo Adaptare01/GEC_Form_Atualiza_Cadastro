@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProgressBar } from '../components/ProgressBar';
 import { useFormContext, FormData } from '../contexts/FormContext';
-import { submitRegistration, sendConfirmationEmail } from '../services/supabase';
+import { submitRegistration, sendConfirmationEmail } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 

@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Textarea } from '../components/ui/Textarea';
 import { useFormContext } from '../contexts/FormContext';
-import { checkCpfExists } from '../services/supabase';
+import { checkCpfExists } from '../services/api';
 
 interface PersonalDataScreenProps {
   onNext: () => void;
