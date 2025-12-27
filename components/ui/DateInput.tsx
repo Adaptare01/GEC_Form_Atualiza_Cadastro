@@ -69,14 +69,6 @@ export const DateInput: React.FC<DateInputProps> = ({
         }
     };
 
-    const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        onChange(e.target.value); // This comes as YYYY-MM-DD from native picker
-    };
-
-    const openCalendar = () => {
-        hiddenDateRef.current?.showPicker();
-    };
-
     return (
         <div className="relative">
             {/* The visible text input */}
@@ -88,31 +80,11 @@ export const DateInput: React.FC<DateInputProps> = ({
                     onChange={handleTextChange}
                     error={error}
                     maxLength={10}
-                    className={`pr-10 ${className || ''}`}
+                    className={className}
                     inputMode="numeric"
-                // Allow opening calendar by clicking icon
                 />
-
-                {/* Calendar Icon Button */}
-                <button
-                    type="button"
-                    onClick={openCalendar}
-                    className="absolute right-3 top-[34px] p-1 text-gray-400 hover:text-primary transition-colors z-10"
-                    aria-label="Selecionar data no calendário"
-                >
-                    <span className="material-symbols-outlined text-[24px]">calendar_month</span>
-                </button>
             </div>
 
-            {/* Hidden native Date Input for the picker functionality */}
-            <input
-                ref={hiddenDateRef}
-                type="date"
-                value={value || ''}
-                onChange={handleCalendarChange}
-                className="invisible absolute top-0 left-0 w-0 h-0"
-                tabIndex={-1}
-            />
             {helperText && (
                 <span className={`text-xs ${error ? 'text-red-500' : 'text-gray-500'} mt-1 block`}>
                     {helperText}
