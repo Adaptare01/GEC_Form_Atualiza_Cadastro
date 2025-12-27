@@ -65,8 +65,9 @@ serve(async (req) => {
                             if (typeof value === 'object' && value !== null) {
                                 displayValue = JSON.stringify(value, null, 2);
                                 if (key === 'dependents_data' && Array.isArray(value)) {
-                                    displayValue = value.map((d: any) => `${d.name} (${d.dob})`).join(', ');
-                                    if (!value.length) displayValue = 'Nenhum';
+                                    const deps = value as any[];
+                                    displayValue = deps.map((d: any) => `${d.name} (${d.dob})`).join(', ');
+                                    if (!deps.length) displayValue = 'Nenhum';
                                 } else if (key === 'spouse_data') {
                                     displayValue = `${(value as any).name}`;
                                 } else if (key === 'professional_data') {
