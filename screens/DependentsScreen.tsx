@@ -4,6 +4,7 @@ import { useFormContext, FormData } from '../contexts/FormContext';
 import { submitRegistration, sendConfirmationEmail } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { DateInput } from '../components/ui/DateInput';
 
 interface DependentsScreenProps {
   onNext: () => void;
@@ -140,13 +141,11 @@ export const DependentsScreen: React.FC<DependentsScreenProps> = ({ onNext, onBa
                 onChange={(e) => setNewDepName(e.target.value)}
                 error={formError && !newDepName}
               />
-              <Input
+              <DateInput
                 label="Data de Nascimento"
-                type="date"
                 value={newDepDob}
-                onChange={(e) => setNewDepDob(e.target.value)}
+                onChange={(date) => setNewDepDob(date)}
                 error={formError && !newDepDob}
-                className="[color-scheme:light] dark:[color-scheme:dark]"
               />
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-text-secondary dark:text-gray-300 font-semibold text-sm hover:bg-gray-50 dark:hover:bg-white/5">Cancelar</button>

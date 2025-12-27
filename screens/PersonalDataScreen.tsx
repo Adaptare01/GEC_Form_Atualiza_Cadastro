@@ -3,6 +3,7 @@ import { Header } from '../components/Header';
 import { ProgressBar } from '../components/ProgressBar';
 import { FooterLogo } from '../components/FooterLogo';
 import { Input } from '../components/ui/Input';
+import { DateInput } from '../components/ui/DateInput';
 import { Button } from '../components/ui/Button';
 import { Textarea } from '../components/ui/Textarea';
 import { useFormContext } from '../contexts/FormContext';
@@ -147,13 +148,11 @@ export const PersonalDataScreen: React.FC<PersonalDataScreenProps> = ({ onNext, 
                 </div>
               </div>
 
-              <Input
+              <DateInput
                 label="Data de Nascimento"
-                type="date"
                 value={formData.dob}
-                onChange={(e) => handleChange('dob', e.target.value)}
+                onChange={(date) => handleChange('dob', date)}
                 error={errors.dob}
-                className="[color-scheme:light] dark:[color-scheme:dark]"
               />
 
               <Input
