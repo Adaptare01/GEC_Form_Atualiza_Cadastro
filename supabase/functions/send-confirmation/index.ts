@@ -34,7 +34,7 @@ serve(async (req) => {
                 'Authorization': `Bearer ${RESEND_API_KEY}`,
             },
             body: JSON.stringify({
-                from: 'GEC Recadastramento <onboarding@resend.dev>', // User must verify domain to change this
+                from: 'GEC Recadastramento <recadastramento@adaptaresoftware.com.br>', // Verified domain
                 to: record.email,
                 subject: 'Confirmação de Recadastramento 2025',
                 html: `
