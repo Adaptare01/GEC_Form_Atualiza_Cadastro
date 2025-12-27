@@ -89,6 +89,7 @@ export const DateInput: React.FC<DateInputProps> = ({
                     error={error}
                     maxLength={10}
                     className={`pr-10 ${className || ''}`}
+                    inputMode="numeric"
                 // Allow opening calendar by clicking icon
                 />
 
