@@ -1,88 +1,44 @@
-import { createClient } from '@supabase/supabase-js';
-import { FormData } from '../contexts/FormContext';
+// services/api.ts
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Função para verificar se o CPF já existe
+export const checkCpfExists = async (cpf: string): Promise<boolean> => {
+  try {
+    // Atenção aqui: o uso correto da crase (backtick) sem barra antes
+    const response = await fetch(`/api/check-cpf?cpf=${encodeURIComponent(cpf)}`);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Supabase keys are missing in environment variables');
-}
-
-// Prevent app crash if keys are missing
-export const supabase = (supabaseUrl && supabaseAnonKey)
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
-
-export const submitRegistration = async (data: FormData) => {
-    if (!supabase) {
-        console.error('Supabase client is not initialized. Check your .env.local file.');
-        throw new Error('Configuração do Supabase ausente. Reinicie o servidor.');
+    if (!response.ok) {
+      console.error('Erro na verificação de CPF:', response.statusText);
+      return false;
     }
 
-    const { data: result, error } = await supabase
-        .from('registrations')
-        .insert([
-            {
-                full_name: data.fullName,
-                cpf: data.cpf,
-                rg: data.rg,
-                dob: data.dob || null,
-                street: data.street,
-                neighborhood: data.neighborhood,
-                city: data.city,
-                address_obs: data.observation,
-                // address: data.address, // Legacy field, not used
-                whatsapp: data.whatsapp,
-                email: data.email,
-                professional_data: {
-                    profession: data.profession,
-                    company: data.company,
-                    workAddress: data.workAddress,
-                    workPhone: data.workPhone
-                },
-                spouse_data: data.hasSpouse ? {
-                    name: data.spouseName,
-                    email: data.spouseEmail,
-                    dob: data.spouseDob // Optional/Legacy
-                } : null,
-                dependents_data: data.dependents
-            }
-        ])
-        .select()
-        .single();
+    const data = await response.json();
+    return data.exists;
+  } catch (error) {
+    console.error('Erro de conexão ao verificar CPF:', error);
+    return false;
+  }
+};
 
-    if (error) {
-        throw error;
+// Função para enviar o cadastro completo
+export const submitRegistration = async (formData: any) => {
+  try {
+    const response = await fetch('/api/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Erro ao processar cadastro');
     }
 
     return result;
+  } catch (error) {
+    console.error('Erro no envio:', error);
+    throw error;
+  }
 };
-
-export const checkCpfExists = async (cpf: string): Promise<boolean> => {
-    if (!supabase) return false;
-
-    const { data, error } = await supabase.rpc('check_cpf_exists', {
-        cpf_input: cpf
-    });
-
-    if (error) {
-        console.error('Error checking CPF:', error);
-        return false;
-    }
-
-    return !!data;
-};
-
-export const sendConfirmationEmail = async (params: any) => {
-    if (!supabase) return;
-
-    const { error } = await supabase.functions.invoke('send-confirmation', {
-        body: { record: params }
-    });
-
-    if (error) {
-        console.error('Error sending confirmation email:', error);
-    }
-};
-
-

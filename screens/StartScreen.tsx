@@ -17,7 +17,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onNext }) => {
         <div className="flex flex-col items-center justify-center py-6">
           <div className="relative w-48 h-48 rounded-full bg-white shadow-lg flex items-center justify-center mb-4 overflow-hidden border-4 border-white dark:border-gray-800 p-4">
             <img
-              src="https://iihclwupztivjontlfre.supabase.co/storage/v1/object/sign/Imagens/GE_Comercial.svg.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9jMTdiZDQ0YS1mYzJkLTRlNWYtODk5Yy1mOGM1NjhhNTU1ZTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJJbWFnZW5zL0dFX0NvbWVyY2lhbC5zdmcucG5nIiwiaWF0IjoxNzY2NzgwMTEzLCJleHAiOjE5MjQ0NjAxMTN9.0w5Cha6WHcV8xZUYXmMleKJV9x_MyhvX-uI5UnhxaHE"
+              src="/logo-gec.png"
               alt="Brasão GEC"
               className="w-full h-full object-contain drop-shadow-sm"
             />

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProgressBar } from '../components/ProgressBar';
 import { useFormContext, FormData } from '../contexts/FormContext';
-import { submitRegistration, sendConfirmationEmail } from '../services/api';
+import { submitRegistration } from '../services/api';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { DateInput } from '../components/ui/DateInput';
@@ -76,10 +76,8 @@ export const DependentsScreen: React.FC<DependentsScreenProps> = ({ onNext, onBa
       setIsSubmitting(true);
       const result = await submitRegistration(formData);
 
-      // Send confirmation email asynchronously (fire and forget)
-      if (result && result.id) {
-        sendConfirmationEmail(result);
-      }
+      // Email sending logic removed as part of Vercel migration
+      // Checks for ID or success could be done here if needed
 
       onNext(); // Go to Success Screen
     } catch (error: any) {
