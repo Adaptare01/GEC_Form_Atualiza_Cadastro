@@ -18,37 +18,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
   try {
-    // 1. Recebe os dados (pode vir como string ou objeto)
+    // 1. Recebe os dados
     let body = req.body;
     if (typeof body === 'string') {
       try { body = JSON.parse(body); } catch (e) { }
     }
 
-    // 2. TRADUÇÃO: Mapeia os campos do Front (Inglês) para o Banco (Português)
-    // Os nomes à esquerda são o que vem do seu print (Payload)
+    console.log('Dados recebidos (Raw):', body); // Log para conferência
+
+    // 2. TRADUÇÃO: Mapeia do Inglês (Site) para Português (Banco)
     const {
-      fullName,       // Front: fullName -> Banco: nome
+      fullName,       // Site manda fullName
       cpf,            // Igual
-      dob,            // Front: dob -> Banco: data_nascimento
-      whatsapp,       // Front: whatsapp -> Banco: celular
+      dob,            // Site manda dob (Date of Birth)
+      whatsapp,       // Site manda whatsapp
       email,          // Igual
-      street,         // Front: street -> Banco: logradouro
-      number,         // Front: number -> Banco: numero
-      neighborhood,   // Front: neighborhood -> Banco: bairro
-      city,           // Front: city -> Banco: cidade
-      state,          // Front: state -> Banco: estado
-      zipCode,        // Front: zipCode -> Banco: cep
+      street,         // Site manda street
+      number,         // Site manda number
+      neighborhood,   // Site manda neighborhood
+      city,           // Site manda city
+      state,          // Site manda state
+      zipCode,        // Site manda zipCode
       dependents,     // Array de dependentes
-      acceptedTerms   // Front: acceptedTerms -> Banco: aceite_termos (chute educado, ajustamos se falhar)
+      acceptedTerms   // Site manda acceptedTerms
     } = body || {};
 
-    // 3. Validação usando os nomes traduzidos
+    // 3. Validação (Agora verifica se 'fullName' chegou, pois ele vira o 'nome')
     if (!cpf || !fullName) {
-      console.log('ERRO DE DADOS:', body); // Mantivemos o log para segurança
+      console.log('Faltou nome ou CPF. Recebido:', { fullName, cpf });
       return res.status(400).json({ error: 'Nome e CPF são obrigatórios' });
     }
 
-    // 4. Inserir Sócio Principal
+    // 4. Inserir no Banco (Usando os nomes traduzidos)
     const textSocio = `
       INSERT INTO registros_socios 
       (nome, cpf, data_nascimento, celular, email, logradouro, numero, bairro, cidade, estado, cep, aceite_termos, data_registro)
@@ -57,35 +58,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     `;
 
     const valuesSocio = [
-      fullName,               // $1: nome
+      fullName,               // $1: Vai para coluna 'nome'
       cpf,                    // $2: cpf
-      dob,                    // $3: data_nascimento
-      whatsapp,               // $4: celular
+      dob,                    // $3: Vai para 'data_nascimento'
+      whatsapp,               // $4: Vai para 'celular'
       email,                  // $5: email
-      street || null,         // $6: logradouro
-      number || null,         // $7: numero
-      neighborhood || null,   // $8: bairro
-      city || null,           // $9: cidade
-      state || null,          // $10: estado
-      zipCode || null,        // $11: cep
-      acceptedTerms || true   // $12: aceite (assume true se vier vazio)
+      street || null,         // $6: Vai para 'logradouro'
+      number || null,         // $7: Vai para 'numero'
+      neighborhood || null,   // $8: Vai para 'bairro'
+      city || null,           // $9: Vai para 'cidade'
+      state || null,          // $10: Vai para 'estado'
+      zipCode || null,        // $11: Vai para 'cep'
+      acceptedTerms || true   // $12: aceite
     ];
 
     const resultSocio = await db.query(textSocio, valuesSocio);
     const socioId = resultSocio.rows[0].id;
 
-    // 5. Inserir Dependentes (Traduzindo também)
+    // 5. Inserir Dependentes (Traduzindo campos de dentro do array)
     if (dependents && Array.isArray(dependents) && dependentes.length > 0) {
       for (const dep of dependentes) {
-        // O front manda: { name: "...", dob: "...", relationship: "..." }
+        // O site manda: name, dob, relationship
         if (dep.name) {
           await db.query(
             'INSERT INTO dependentes (socio_id, nome, data_nascimento, parentesco) VALUES ($1, $2, $3, $4)',
             [
               socioId,
-              dep.name,          // Front: name
-              dep.dob,           // Front: dob
-              dep.relationship   // Front: relationship
+              dep.name,          // Site: name -> Banco: nome
+              dep.dob,           // Site: dob -> Banco: data_nascimento
+              dep.relationship   // Site: relationship -> Banco: parentesco
             ]
           );
         }
@@ -95,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ message: 'Sucesso!', id: socioId });
 
   } catch (error: any) {
-    console.error('ERRO NO BANCO:', error);
-    return res.status(500).json({ error: 'Erro interno', details: error.message });
+    console.error('ERRO CRÍTICO NO BANCO:', error);
+    return res.status(500).json({ error: 'Erro ao salvar no banco', details: error.message });
   }
 }
