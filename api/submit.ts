@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { randomUUID } from 'crypto'; // Importante: Gerador de IDs
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const db = new Pool({
@@ -36,13 +37,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Nome e CPF são obrigatórios' });
     }
 
-    // Função auxiliar para evitar erro de data vazia ("") no Postgres
     const formatDate = (date: string) => date && date.trim() !== '' ? date : null;
 
-    // 1. INSERIR SÓCIO (Tabela: registros_socios)
+    // 1. GERAR ID MANUALMENTE
+    const novoIdSocio = randomUUID();
+
+    // 2. INSERIR SÓCIO (Agora enviando o ID explicitamente)
     const textSocio = `
       INSERT INTO registros_socios 
       (
+        id, 
         full_name, 
         cpf, 
         rg, 
@@ -60,35 +64,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         data_nasc_conjuge, 
         created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
       RETURNING id
     `;
 
-    // Montamos o endereço completo (Rua + Número) para o campo 'address'
     const fullAddress = number ? `${street}, ${number}` : street;
 
     const valuesSocio = [
-      fullName,               // full_name
-      cpf,                    // cpf
-      rg,                     // rg
-      formatDate(dob),        // dob
-      email,                  // email
-      whatsapp,               // whatsapp
-      street,                 // street
-      fullAddress,            // address
-      neighborhood,           // neighborhood
-      city,                   // city
-      company,                // empresa
-      profession,             // cargo
-      workPhone,              // telefone_trabalho
-      spouseName,             // nome_conjuge
-      formatDate(spouseDob)   // data_nasc_conjuge
+      novoIdSocio,            // $1: O ID que geramos agora
+      fullName,               // $2: full_name
+      cpf,                    // $3: cpf
+      rg,                     // $4: rg
+      formatDate(dob),        // $5: dob
+      email,                  // $6: email
+      whatsapp,               // $7: whatsapp
+      street,                 // $8: street
+      fullAddress,            // $9: address
+      neighborhood,           // $10: neighborhood
+      city,                   // $11: city
+      company,                // $12: empresa
+      profession,             // $13: cargo
+      workPhone,              // $14: telefone_trabalho
+      spouseName,             // $15: nome_conjuge
+      formatDate(spouseDob)   // $16: data_nasc_conjuge
     ];
 
     const resultSocio = await db.query(textSocio, valuesSocio);
     const socioId = resultSocio.rows[0].id;
 
-    // 2. INSERIR DEPENDENTES (Tabela: dependentes_socios)
+    // 3. INSERIR DEPENDENTES
     if (dependents && Array.isArray(dependents) && dependentes.length > 0) {
       for (const dep of dependentes) {
         if (dep.name) {
@@ -98,9 +102,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              VALUES ($1, $2, $3, $4)`,
             [
               socioId,
-              dep.name,            // Front: name -> Banco: nome_dependente
-              formatDate(dep.dob), // Front: dob -> Banco: data_nascimento
-              dep.relationship     // Front: relationship -> Banco: parentesco
+              dep.name,
+              formatDate(dep.dob),
+              dep.relationship
             ]
           );
         }
