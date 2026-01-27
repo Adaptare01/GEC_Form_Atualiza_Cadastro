@@ -1,11 +1,14 @@
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Resend } from 'resend';
 
 const db = new Pool({
   connectionString: process.env.POSTGRES_URL,
-  ssl: false
+  ssl: process.env.POSTGRES_URL?.includes('localhost') ? false : { rejectUnauthorized: false }
 });
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -110,6 +113,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
         }
       }
+    }
+
+    // 4. ENVIAR EMAIL (RESEND)
+    try {
+      await resend.emails.send({
+        from: 'GEC Recadastramento <recadastramento@adaptaresoftware.com.br>',
+        to: email, // Email do sócio
+        subject: 'Confirmação de Recadastramento 2025',
+        html: `
+          <h1>Olá, ${fullName}!</h1>
+          <p>Recebemos seus dados com sucesso, conforme descrito abaixo:</p>
+          <p><strong>Protocolo:</strong> ${novoIdSocio}</p>
+
+          <h3>Dados Principais</h3>
+          <ul style="list-style: none; padding: 0;">
+             <li><strong>Nome:</strong> ${fullName}</li>
+             <li><strong>CPF:</strong> ${cpf}</li>
+             <li><strong>Telefone/WhatsApp:</strong> ${whatsapp || '-'}</li>
+             <li><strong>Endereço:</strong> ${fullAddress}</li>
+             <li><strong>Cidade:</strong> ${city || '-'}</li>
+          </ul>
+
+          <p>Caso tenha alguma informação errada, favor entrar em contato com a secretaria.</p>
+          <br>
+          <p>Atenciosamente,<br>Diretoria GEC</p>
+        `
+      });
+      console.log('Email enviado com sucesso para:', email);
+    } catch (emailError: any) {
+      console.error('Erro ao enviar email:', emailError);
+      // Não falhamos o request principal se apenas o email falhar, mas logamos
     }
 
     return res.status(200).json({ message: 'Sucesso!', id: socioId });
