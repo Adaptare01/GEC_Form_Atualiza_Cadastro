@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { randomUUID } from 'crypto'; // Importante: Gerador de IDs
+import { randomUUID } from 'crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const db = new Pool({
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       street, number, neighborhood, city,
       company, profession, workPhone,
       spouseName, spouseDob,
-      dependents
+      dependents // <--- AQUI ESTÁ O NOME EM INGLÊS QUE VEM DO SITE
     } = body || {};
 
     if (!cpf || !fullName) {
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 1. GERAR ID MANUALMENTE
     const novoIdSocio = randomUUID();
 
-    // 2. INSERIR SÓCIO (Agora enviando o ID explicitamente)
+    // 2. INSERIR SÓCIO
     const textSocio = `
       INSERT INTO registros_socios 
       (
@@ -71,30 +71,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fullAddress = number ? `${street}, ${number}` : street;
 
     const valuesSocio = [
-      novoIdSocio,            // $1: O ID que geramos agora
-      fullName,               // $2: full_name
-      cpf,                    // $3: cpf
-      rg,                     // $4: rg
-      formatDate(dob),        // $5: dob
-      email,                  // $6: email
-      whatsapp,               // $7: whatsapp
-      street,                 // $8: street
-      fullAddress,            // $9: address
-      neighborhood,           // $10: neighborhood
-      city,                   // $11: city
-      company,                // $12: empresa
-      profession,             // $13: cargo
-      workPhone,              // $14: telefone_trabalho
-      spouseName,             // $15: nome_conjuge
-      formatDate(spouseDob)   // $16: data_nasc_conjuge
+      novoIdSocio,
+      fullName,
+      cpf,
+      rg,
+      formatDate(dob),
+      email,
+      whatsapp,
+      street,
+      fullAddress,
+      neighborhood,
+      city,
+      company,
+      profession,
+      workPhone,
+      spouseName,
+      formatDate(spouseDob)
     ];
 
     const resultSocio = await db.query(textSocio, valuesSocio);
     const socioId = resultSocio.rows[0].id;
 
-    // 3. INSERIR DEPENDENTES
-    if (dependents && Array.isArray(dependents) && dependentes.length > 0) {
-      for (const dep of dependentes) {
+    // 3. INSERIR DEPENDENTES (CORRIGIDO AQUI)
+    // Antes estava escrito "dependentes" (português), mudei para "dependents" (inglês) para casar com a variável lá de cima
+    if (dependents && Array.isArray(dependents) && dependents.length > 0) {
+      for (const dep of dependents) {
         if (dep.name) {
           await db.query(
             `INSERT INTO dependentes_socios 
