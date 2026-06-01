@@ -6,9 +6,12 @@ const db = new Pool({
   ssl: process.env.POSTGRES_URL?.includes('localhost') ? false : { rejectUnauthorized: false }
 });
 
-const ADMIN_TOKEN = Buffer.from('adaptaresoftware@gmail.com:admin12345').toString('base64');
+const USERS = [
+  { email: 'adaptaresoftware@gmail.com', role: 'admin' },
+  { email: 'nezio.ouriques@coliberte.com.br', role: 'viewer' },
+];
 
-function isAuthenticated(req: VercelRequest): boolean {
+function getSession(req: VercelRequest): { email: string; role: string } | null {
   const cookieHeader = req.headers.cookie || '';
   const cookies = Object.fromEntries(
     cookieHeader.split(';').map(c => {
@@ -16,7 +19,17 @@ function isAuthenticated(req: VercelRequest): boolean {
       return [k, v.join('=')];
     })
   );
-  return cookies['admin_token'] === ADMIN_TOKEN;
+  const token = cookies['admin_token'];
+  if (!token) return null;
+
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf-8');
+    const [email, role] = decoded.split(':');
+    const validUser = USERS.find(u => u.email === email && u.role === role);
+    return validUser ? { email, role } : null;
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -27,11 +40,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (!isAuthenticated(req)) {
+  const session = getSession(req);
+  if (!session) {
     return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  // GET /api/admin/socios — lista todos com dependentes
+  // GET — permitido para todos
   if (req.method === 'GET') {
     const { nome_socio, nome_dependente } = req.query;
 
@@ -58,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     const sociosResult = await db.query(
-      `SELECT 
+      `SELECT
         s.id, s.full_name, s.cpf, s.rg, s.dob, s.email, s.whatsapp,
         s.street, s.address, s.neighborhood, s.city,
         s.empresa, s.cargo, s.telefone_trabalho,
@@ -72,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const socios = sociosResult.rows;
 
     if (socios.length === 0) {
-      return res.status(200).json({ socios: [] });
+      return res.status(200).json({ socios: [], role: session.role });
     }
 
     const socioIds = socios.map(s => s.id);
@@ -95,11 +109,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dependentes: depMap[s.id] || []
     }));
 
-    return res.status(200).json({ socios: result });
+    // Retorna o role junto para o frontend saber o que exibir
+    return res.status(200).json({ socios: result, role: session.role });
   }
 
-  // DELETE /api/admin/socios?id=xxx — exclui sócio e dependentes
+  // DELETE — somente admin
   if (req.method === 'DELETE') {
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: 'Sem permissão para excluir registros' });
+    }
+
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'ID obrigatório' });
 

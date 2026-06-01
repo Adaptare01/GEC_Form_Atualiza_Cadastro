@@ -6,9 +6,12 @@ const db = new Pool({
   ssl: process.env.POSTGRES_URL?.includes('localhost') ? false : { rejectUnauthorized: false }
 });
 
-const ADMIN_TOKEN = Buffer.from('adaptaresoftware@gmail.com:admin12345').toString('base64');
+const USERS = [
+  { email: 'adaptaresoftware@gmail.com', role: 'admin' },
+  { email: 'nezio.ouriques@coliberte.com.br', role: 'viewer' },
+];
 
-function isAuthenticated(req: VercelRequest): boolean {
+function getSession(req: VercelRequest): { email: string; role: string } | null {
   const cookieHeader = req.headers.cookie || '';
   const cookies = Object.fromEntries(
     cookieHeader.split(';').map(c => {
@@ -16,7 +19,17 @@ function isAuthenticated(req: VercelRequest): boolean {
       return [k, v.join('=')];
     })
   );
-  return cookies['admin_token'] === ADMIN_TOKEN;
+  const token = cookies['admin_token'];
+  if (!token) return null;
+
+  try {
+    const decoded = Buffer.from(token, 'base64').toString('utf-8');
+    const [email, role] = decoded.split(':');
+    const validUser = USERS.find(u => u.email === email && u.role === role);
+    return validUser ? { email, role } : null;
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -27,14 +40,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (!isAuthenticated(req)) {
+  const session = getSession(req);
+  if (!session) {
     return res.status(401).json({ error: 'Não autorizado' });
+  }
+
+  if (session.role !== 'admin') {
+    return res.status(403).json({ error: 'Sem permissão para editar registros' });
   }
 
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'ID obrigatório' });
 
-  // PUT /api/admin/socio/[id] — atualiza sócio e dependentes
   if (req.method === 'PUT') {
     const {
       full_name, cpf, rg, dob, email, whatsapp,
@@ -64,7 +81,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ]
     );
 
-    // Reinsere dependentes: apaga os existentes e insere os novos
     await db.query('DELETE FROM dependentes_socios WHERE socio_id = $1', [id]);
     if (dependentes && Array.isArray(dependentes)) {
       for (const dep of dependentes) {

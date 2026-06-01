@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import * as XLSX from 'xlsx';
 
 // ─── Design Tokens (GEC) ─────────────────────────────────────────────────────
 const C = {
@@ -29,6 +30,79 @@ const fmtCpf = (cpf: string) => {
   return n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 };
 const toDateInput = (d: string | null) => d ? d.slice(0, 10) : '';
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+function exportToXlsx(socios: Socio[]) {
+  const rows: Record<string, string>[] = [];
+
+  for (const s of socios) {
+    const base = {
+      'Nome do Sócio': s.full_name || '',
+      'CPF': fmtCpf(s.cpf),
+      'RG': s.rg || '',
+      'Nascimento': fmtDate(s.dob),
+      'E-mail': s.email || '',
+      'WhatsApp': s.whatsapp || '',
+      'Cidade': s.city || '',
+      'Bairro': s.neighborhood || '',
+      'Endereço': s.address || '',
+      'Empresa': s.empresa || '',
+      'Cargo/Profissão': s.cargo || '',
+      'Tel. Comercial': s.telefone_trabalho || '',
+      'Cônjuge': s.nome_conjuge || '',
+      'Nasc. Cônjuge': fmtDate(s.data_nasc_conjuge),
+      'Cadastro em': fmtDate(s.created_at),
+      'Dependente': '',
+      'Parentesco': '',
+      'Nasc. Dependente': '',
+    };
+
+    if (s.dependentes.length === 0) {
+      rows.push(base);
+    } else {
+      s.dependentes.forEach((dep, i) => {
+        rows.push({
+          ...base,
+          // Após a primeira linha do sócio, limpa os campos dele para não repetir
+          ...(i > 0 ? {
+            'Nome do Sócio': '',
+            'CPF': '',
+            'RG': '',
+            'Nascimento': '',
+            'E-mail': '',
+            'WhatsApp': '',
+            'Cidade': '',
+            'Bairro': '',
+            'Endereço': '',
+            'Empresa': '',
+            'Cargo/Profissão': '',
+            'Tel. Comercial': '',
+            'Cônjuge': '',
+            'Nasc. Cônjuge': '',
+            'Cadastro em': '',
+          } : {}),
+          'Dependente': dep.nome_dependente || '',
+          'Parentesco': dep.parentesco || '',
+          'Nasc. Dependente': fmtDate(dep.data_nascimento),
+        });
+      });
+    }
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Largura das colunas
+  ws['!cols'] = [
+    { wch: 30 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 28 },
+    { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 28 }, { wch: 22 },
+    { wch: 18 }, { wch: 16 }, { wch: 24 }, { wch: 14 }, { wch: 14 },
+    { wch: 28 }, { wch: 16 }, { wch: 16 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sócios');
+  XLSX.writeFile(wb, `GEC_Socios_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Dependente {
@@ -398,7 +472,7 @@ function EditModal({ socio, onClose, onSave }: { socio: Socio; onClose: () => vo
 }
 
 // ─── Socio Card ───────────────────────────────────────────────────────────────
-function SocioCard({ socio, onEdit, onDelete }: { socio: Socio; onEdit: (s: Socio) => void; onDelete: (s: Socio) => void }) {
+function SocioCard({ socio, onEdit, onDelete, isAdmin }: { socio: Socio; onEdit: (s: Socio) => void; onDelete: (s: Socio) => void; isAdmin: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const initials = socio.full_name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
@@ -500,16 +574,20 @@ function SocioCard({ socio, onEdit, onDelete }: { socio: Socio; onEdit: (s: Soci
         ) : <div />}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => onEdit(socio)} style={{
-            background: '#fff', border: `1.5px solid ${C.border}`,
-            borderRadius: 10, color: C.text, fontSize: 13,
-            padding: '6px 14px', cursor: 'pointer', fontWeight: 600,
-          }}>Editar</button>
-          <button onClick={() => onDelete(socio)} style={{
-            background: C.primaryLight, border: `1.5px solid ${C.primaryBorder}`,
-            borderRadius: 10, color: C.primary, fontSize: 13,
-            padding: '6px 14px', cursor: 'pointer', fontWeight: 600,
-          }}>Excluir</button>
+          {isAdmin && (
+            <>
+              <button onClick={() => onEdit(socio)} style={{
+                background: '#fff', border: `1.5px solid ${C.border}`,
+                borderRadius: 10, color: C.text, fontSize: 13,
+                padding: '6px 14px', cursor: 'pointer', fontWeight: 600,
+              }}>Editar</button>
+              <button onClick={() => onDelete(socio)} style={{
+                background: C.primaryLight, border: `1.5px solid ${C.primaryBorder}`,
+                borderRadius: 10, color: C.primary, fontSize: 13,
+                padding: '6px 14px', cursor: 'pointer', fontWeight: 600,
+              }}>Excluir</button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -519,12 +597,14 @@ function SocioCard({ socio, onEdit, onDelete }: { socio: Socio; onEdit: (s: Soci
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [socios, setSocios] = useState<Socio[]>([]);
+  const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
   const [loading, setLoading] = useState(true);
   const [nomeSocio, setNomeSocio] = useState('');
   const [nomeDep, setNomeDep] = useState('');
   const [editingSocio, setEditingSocio] = useState<Socio | null>(null);
   const [deletingSocio, setDeletingSocio] = useState<Socio | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const isAdmin = role === 'admin';
 
   const fetchSocios = useCallback(async () => {
     setLoading(true);
@@ -536,6 +616,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       if (res.status === 401) { onLogout(); return; }
       const data = await res.json();
       setSocios(data.socios || []);
+      if (data.role) setRole(data.role);
     } catch { setSocios([]); }
     finally { setLoading(false); }
   }, [nomeSocio, nomeDep]);
@@ -586,10 +667,37 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <span style={{ color: C.textMuted, fontSize: 13, marginLeft: 6 }}>Recadastramento 2025</span>
           </div>
         </div>
-        <button onClick={handleLogout} style={{
-          background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
-          color: C.textSub, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-        }}>Sair</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isAdmin && (
+            <button
+              onClick={() => exportToXlsx(socios)}
+              disabled={socios.length === 0}
+              style={{
+                background: socios.length === 0 ? C.bg : '#e8f5e9',
+                border: `1px solid ${socios.length === 0 ? C.border : '#a5d6a7'}`,
+                borderRadius: 10,
+                color: socios.length === 0 ? C.textMuted : '#2e7d32',
+                padding: '6px 14px',
+                cursor: socios.length === 0 ? 'not-allowed' : 'pointer',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              ⬇ Exportar Excel
+            </button>
+          )}
+          {!isAdmin && (
+            <span style={{
+              background: '#fef9c3', border: '1px solid #fde047',
+              borderRadius: 8, padding: '4px 10px',
+              fontSize: 12, color: '#854d0e', fontWeight: 600,
+            }}>Somente leitura</span>
+          )}
+          <button onClick={handleLogout} style={{
+            background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
+            color: C.textSub, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          }}>Sair</button>
+        </div>
       </div>
 
       <div style={{ padding: '28px 24px', maxWidth: 960, margin: '0 auto' }}>
@@ -661,7 +769,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {socios.map(s => (
-              <SocioCard key={s.id} socio={s} onEdit={setEditingSocio} onDelete={setDeletingSocio} />
+              <SocioCard key={s.id} socio={s} onEdit={setEditingSocio} onDelete={setDeletingSocio} isAdmin={isAdmin} />
             ))}
           </div>
         )}
