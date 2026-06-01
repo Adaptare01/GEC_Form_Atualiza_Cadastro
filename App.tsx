@@ -9,6 +9,7 @@ import { DependentsScreen } from './screens/DependentsScreen';
 import { SuccessScreen } from './screens/SuccessScreen';
 import { SummaryScreen } from './screens/SummaryScreen';
 import { FormProvider } from './contexts/FormContext';
+import AdminScreen from './screens/AdminScreen';
 
 const AppContent: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<Step>(Step.Start);
@@ -16,13 +17,17 @@ const AppContent: React.FC = () => {
   const [viewId, setViewId] = useState<string | null>(null);
 
   React.useEffect(() => {
-    // Check URL for id parameter
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (id) {
       setViewId(id);
     }
   }, []);
+
+  // Rota /admin
+  if (window.location.pathname === '/admin') {
+    return <AdminScreen />;
+  }
 
   if (viewId) {
     return <SummaryScreen id={viewId} />;
