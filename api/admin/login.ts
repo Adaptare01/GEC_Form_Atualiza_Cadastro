@@ -7,6 +7,7 @@ function getPool(): Pool {
     _pool = new Pool({
       connectionString: process.env.POSTGRES_URL,
       ssl: process.env.POSTGRES_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
+      max: 1,
     });
   }
   return _pool;
