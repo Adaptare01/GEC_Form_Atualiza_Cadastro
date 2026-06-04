@@ -1,36 +1,5 @@
-import { Pool } from 'pg';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const db = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-  ssl: process.env.POSTGRES_URL?.includes('localhost') ? false : { rejectUnauthorized: false }
-});
-
-const USERS = [
-  { email: 'adaptaresoftware@gmail.com', role: 'admin' },
-  { email: 'nezio.ouriques@coliberte.com.br', role: 'viewer' },
-];
-
-function getSession(req: VercelRequest): { email: string; role: string } | null {
-  const cookieHeader = req.headers.cookie || '';
-  const cookies = Object.fromEntries(
-    cookieHeader.split(';').map(c => {
-      const [k, ...v] = c.trim().split('=');
-      return [k, v.join('=')];
-    })
-  );
-  const token = cookies['admin_token'];
-  if (!token) return null;
-
-  try {
-    const decoded = Buffer.from(token, 'base64').toString('utf-8');
-    const [email, role] = decoded.split(':');
-    const validUser = USERS.find(u => u.email === email && u.role === role);
-    return validUser ? { email, role } : null;
-  } catch {
-    return null;
-  }
-}
+import { getPool, getSession } from '../../_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -51,6 +20,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'ID obrigatório' });
+
+  const db = getPool();
 
   if (req.method === 'PUT') {
     const {

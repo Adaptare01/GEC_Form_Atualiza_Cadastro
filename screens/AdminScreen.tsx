@@ -594,16 +594,405 @@ function SocioCard({ socio, onEdit, onDelete, isAdmin }: { socio: Socio; onEdit:
   );
 }
 
+// ─── Users Management ────────────────────────────────────────────────────────
+interface AdminUser {
+  id: string;
+  email: string;
+  role: 'admin' | 'viewer';
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+function UserFormModal({
+  user,
+  onClose,
+  onSave,
+}: {
+  user: AdminUser | null;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const isEdit = !!user;
+  const [email, setEmail] = useState(user?.email || '');
+  const [password, setPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setError(''); setSaving(true);
+    try {
+      const body: any = { email: email.trim() };
+      if (password) body.password = password;
+      const url = isEdit ? `/api/admin/users/${user!.id}` : '/api/admin/users';
+      const method = isEdit ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Erro ao salvar');
+      }
+      onSave();
+    } catch (e: any) {
+      setError(e.message || 'Erro ao salvar');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1100,
+      background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: C.bgCard, borderRadius: 20,
+        border: `1px solid ${C.border}`,
+        width: '100%', maxWidth: 460,
+        boxShadow: '0 24px 64px rgba(0,0,0,0.15)',
+      }}>
+        <div style={{
+          padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <h2 style={{ color: C.text, fontSize: 17, fontWeight: 800, margin: 0 }}>
+              {isEdit ? 'Editar usuário' : 'Novo usuário'}
+            </h2>
+            <p style={{ color: C.textSub, fontSize: 12, margin: '2px 0 0' }}>
+              {isEdit ? 'Altere e-mail, senha ou tipo' : 'Crie um novo usuário com acesso de leitura'}
+            </p>
+          </div>
+          <button onClick={onClose} style={{
+            background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
+            color: C.textSub, padding: '6px 12px', cursor: 'pointer', fontSize: 16, fontWeight: 600,
+          }}>✕</button>
+        </div>
+
+        <div style={{ padding: '20px 24px' }}>
+          <Field label="E-mail">
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@email.com" />
+          </Field>
+
+          <Field label={isEdit ? 'Nova senha' : 'Senha'}>
+            <Input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder={isEdit ? 'Deixe em branco para manter a atual' : 'Mínimo 4 caracteres'}
+            />
+          </Field>
+
+          <Field label="Tipo de acesso">
+            <div style={{
+              background: C.bg, border: `1.5px solid ${C.border}`,
+              borderRadius: 10, padding: '10px 13px',
+              display: 'flex', alignItems: 'center', gap: 10,
+              color: C.textSub, fontSize: 14,
+            }}>
+              <span style={{
+                background: '#fef9c3', border: '1px solid #fde047',
+                borderRadius: 8, padding: '2px 8px',
+                fontSize: 11, color: '#854d0e', fontWeight: 700,
+              }}>VIEWER</span>
+              <span>Somente leitura — não pode editar, excluir ou exportar.</span>
+            </div>
+          </Field>
+
+          {error && (
+            <div style={{
+              background: C.primaryLight, border: `1px solid ${C.primaryBorder}`,
+              borderRadius: 10, padding: '10px 14px', color: C.primary, fontSize: 13, marginTop: 8,
+            }}>{error}</div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+            <button onClick={onClose} style={{
+              background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12,
+              color: C.textSub, padding: '11px 22px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+            }}>Cancelar</button>
+            <button onClick={handleSave} disabled={saving || !email.trim() || (!isEdit && !password)} style={{
+              background: saving || !email.trim() || (!isEdit && !password) ? '#e57373' : C.primary,
+              border: 'none', borderRadius: 12,
+              color: '#fff', padding: '11px 28px',
+              cursor: saving || !email.trim() || (!isEdit && !password) ? 'not-allowed' : 'pointer',
+              fontSize: 14, fontWeight: 700,
+              boxShadow: '0 4px 14px rgba(229,57,53,0.3)',
+            }}>{saving ? 'Salvando...' : 'Salvar'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UsersModal({
+  onClose,
+  currentUserEmail,
+}: {
+  onClose: () => void;
+  currentUserEmail: string;
+}) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<AdminUser | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const res = await fetch('/api/admin/users', { credentials: 'include' });
+      if (!res.ok) throw new Error('Falha ao carregar');
+      const data = await res.json();
+      setUsers(data.users || []);
+    } catch (e: any) {
+      setError(e.message || 'Erro ao carregar usuários');
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeletingBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${deleting.id}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Erro ao excluir');
+      }
+      setDeleting(null);
+      load();
+    } catch (e: any) {
+      setError(e.message || 'Erro ao excluir');
+      setDeleting(null);
+    } finally { setDeletingBusy(false); }
+  };
+
+  const initials = (email: string) => {
+    const name = email.split('@')[0];
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const formatDate = (d: string) => {
+    if (!d) return '—';
+    try {
+      const dt = new Date(d);
+      return dt.toLocaleDateString('pt-BR');
+    } catch { return d; }
+  };
+
+  const renderCard = (u: AdminUser) => {
+    const isSelf = u.email.toLowerCase() === currentUserEmail.toLowerCase();
+    return (
+      <div key={u.id} style={{
+        background: C.bg, border: `1px solid ${C.border}`,
+        borderRadius: 14, padding: '14px 16px',
+        display: 'flex', alignItems: 'center', gap: 14,
+      }}>
+        <div style={{
+          width: 42, height: 42, borderRadius: 12,
+          background: u.is_system ? '#fff3e0' : C.primaryLight,
+          border: `1.5px solid ${u.is_system ? '#ffcc80' : C.primaryBorder}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: u.is_system ? '#e65100' : C.primary,
+          fontWeight: 800, fontSize: 14, flexShrink: 0,
+        }}>{initials(u.email)}</div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontWeight: 700, fontSize: 14, color: C.text,
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>{u.email}</div>
+          <div style={{ fontSize: 12, color: C.textSub, marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{
+              background: u.role === 'admin' ? '#fff3e0' : '#fef9c3',
+              border: `1px solid ${u.role === 'admin' ? '#ffcc80' : '#fde047'}`,
+              borderRadius: 6, padding: '1px 6px',
+              fontSize: 10, fontWeight: 700,
+              color: u.role === 'admin' ? '#e65100' : '#854d0e',
+            }}>{u.role.toUpperCase()}</span>
+            {u.is_system && (
+              <span style={{
+                background: '#e3f2fd', border: '1px solid #90caf9',
+                borderRadius: 6, padding: '1px 6px',
+                fontSize: 10, fontWeight: 700, color: '#1565c0',
+              }}>SISTEMA</span>
+            )}
+            {isSelf && (
+              <span style={{ color: C.textMuted, fontSize: 11 }}>· você</span>
+            )}
+            <span style={{ color: C.textMuted, fontSize: 11 }}>· {formatDate(u.created_at)}</span>
+          </div>
+        </div>
+
+        {!u.is_system && (
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            <button onClick={() => setEditing(u)} style={{
+              background: '#fff', border: `1.5px solid ${C.border}`,
+              borderRadius: 10, color: C.text, fontSize: 12,
+              padding: '5px 12px', cursor: 'pointer', fontWeight: 600,
+            }}>Editar</button>
+            <button
+              onClick={() => !isSelf && setDeleting(u)}
+              disabled={isSelf}
+              title={isSelf ? 'Você não pode excluir seu próprio usuário' : 'Excluir'}
+              style={{
+                background: isSelf ? C.bg : C.primaryLight,
+                border: `1.5px solid ${isSelf ? C.border : C.primaryBorder}`,
+                borderRadius: 10,
+                color: isSelf ? C.textMuted : C.primary, fontSize: 12,
+                padding: '5px 12px',
+                cursor: isSelf ? 'not-allowed' : 'pointer', fontWeight: 600,
+              }}>Excluir</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 1050,
+        background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(3px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+      }} onClick={e => e.target === e.currentTarget && onClose()}>
+        <div style={{
+          background: C.bgCard, borderRadius: 20,
+          border: `1px solid ${C.border}`,
+          width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.15)',
+        }}>
+          <div style={{
+            padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            position: 'sticky', top: 0, background: C.bgCard, zIndex: 1,
+          }}>
+            <div>
+              <h2 style={{ color: C.text, fontSize: 18, fontWeight: 800, margin: 0 }}>Usuários do painel</h2>
+              <p style={{ color: C.textSub, fontSize: 13, margin: '2px 0 0' }}>
+                Gerencie quem pode acessar o painel administrativo
+              </p>
+            </div>
+            <button onClick={onClose} style={{
+              background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10,
+              color: C.textSub, padding: '6px 12px', cursor: 'pointer', fontSize: 16, fontWeight: 600,
+            }}>✕</button>
+          </div>
+
+          <div style={{ padding: '20px 24px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 13, color: C.textSub }}>
+                {loading ? 'Carregando...' : `${users.length} usuário(s)`}
+              </div>
+              <button onClick={() => setCreating(true)} style={{
+                background: C.primary, border: 'none', borderRadius: 10,
+                color: '#fff', fontSize: 13, padding: '8px 16px',
+                cursor: 'pointer', fontWeight: 700,
+                boxShadow: '0 4px 12px rgba(229,57,53,0.3)',
+              }}>+ Novo usuário</button>
+            </div>
+
+            {error && (
+              <div style={{
+                background: C.primaryLight, border: `1px solid ${C.primaryBorder}`,
+                borderRadius: 10, padding: '10px 14px', color: C.primary, fontSize: 13, marginBottom: 12,
+              }}>{error}</div>
+            )}
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '32px', color: C.textMuted }}>
+                Carregando usuários...
+              </div>
+            ) : users.length === 0 ? (
+              <div style={{
+                background: C.bg, borderRadius: 12, padding: '32px',
+                textAlign: 'center', color: C.textMuted, fontSize: 14,
+                border: `1px solid ${C.border}`,
+              }}>Nenhum usuário cadastrado.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {users.map(renderCard)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {(creating || editing) && (
+        <UserFormModal
+          user={editing}
+          onClose={() => { setCreating(false); setEditing(null); }}
+          onSave={() => { setCreating(false); setEditing(null); load(); }}
+        />
+      )}
+
+      {deleting && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1200,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(3px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        }}>
+          <div style={{
+            background: C.bgCard, borderRadius: 20, padding: '32px 28px',
+            maxWidth: 400, width: '100%',
+            border: `1px solid ${C.primaryBorder}`,
+            boxShadow: '0 16px 48px rgba(229,57,53,0.12)',
+          }}>
+            <div style={{ textAlign: 'center', fontSize: 40, marginBottom: 16 }}>⚠️</div>
+            <h3 style={{ color: C.text, textAlign: 'center', margin: '0 0 8px', fontSize: 18, fontWeight: 800 }}>
+              Excluir usuário?
+            </h3>
+            <p style={{ color: C.primary, textAlign: 'center', fontSize: 14, fontWeight: 700, margin: '0 0 8px' }}>
+              {deleting.email}
+            </p>
+            <p style={{ color: C.textSub, textAlign: 'center', fontSize: 13, margin: '0 0 24px' }}>
+              Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setDeleting(null)} style={{
+                flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12,
+                color: C.textSub, padding: '11px', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+              }}>Cancelar</button>
+              <button onClick={handleDelete} disabled={deletingBusy} style={{
+                flex: 1, background: deletingBusy ? '#e57373' : C.primary, border: 'none', borderRadius: 12,
+                color: '#fff', padding: '11px', cursor: deletingBusy ? 'not-allowed' : 'pointer',
+                fontSize: 14, fontWeight: 700,
+                boxShadow: '0 4px 14px rgba(229,57,53,0.3)',
+              }}>{deletingBusy ? 'Excluindo...' : 'Confirmar exclusão'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [socios, setSocios] = useState<Socio[]>([]);
   const [role, setRole] = useState<'admin' | 'viewer'>('viewer');
+  const [currentEmail, setCurrentEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [nomeSocio, setNomeSocio] = useState('');
   const [nomeDep, setNomeDep] = useState('');
   const [editingSocio, setEditingSocio] = useState<Socio | null>(null);
   const [deletingSocio, setDeletingSocio] = useState<Socio | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
   const isAdmin = role === 'admin';
 
   const fetchSocios = useCallback(async () => {
@@ -617,6 +1006,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       const data = await res.json();
       setSocios(data.socios || []);
       if (data.role) setRole(data.role);
+      if (data.email) setCurrentEmail(data.email);
     } catch { setSocios([]); }
     finally { setLoading(false); }
   }, [nomeSocio, nomeDep]);
@@ -684,6 +1074,23 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               }}
             >
               ⬇ Exportar Excel
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setUsersOpen(true)}
+              style={{
+                background: C.bg,
+                border: `1px solid ${C.border}`,
+                borderRadius: 10,
+                color: C.textSub,
+                padding: '6px 14px',
+                cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              👤 Usuários
             </button>
           )}
           {!isAdmin && (
@@ -829,6 +1236,14 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de usuários */}
+      {usersOpen && (
+        <UsersModal
+          onClose={() => setUsersOpen(false)}
+          currentUserEmail={currentEmail}
+        />
       )}
     </div>
   );
