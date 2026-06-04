@@ -1,4 +1,4 @@
-import { getPool, requireAdmin, findUserById, countAdmins } from '../../_lib/auth';
+import { getPool, requireAdmin, findUserById, countAdmins } from '../../lib/auth';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const CORS = {
